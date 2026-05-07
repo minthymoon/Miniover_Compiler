@@ -68,6 +68,10 @@ stmt_list:
 
 stmt:
     var_decl { $$ = $1; }
+    | IDENT ASSIGN expr SEMICOLON { 
+        $$ = createNode(NODE_ASSIGN, $1, NULL); 
+        $$->right = $3;
+    }
     | PRINT LPAREN expr RPAREN SEMICOLON {
         $$ = createNode(NODE_PRINT, NULL, NULL);
         $$->right = $3;

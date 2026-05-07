@@ -19,6 +19,23 @@ void setVal(Environment* env, char* name, Value val) {
     env->head = entry;
 }
 
+void updateVal(Environment* env, char* name, Value val) {
+    Environment* currEnv = env;
+    while (currEnv) {
+        ValEntry* curr = currEnv->head;
+        while (curr) {
+            if (strcmp(curr->name, name) == 0) {
+                curr->val = val;
+                return;
+            }
+            curr = curr->next;
+        }
+        currEnv = currEnv->parent;
+    }
+    printf("RUNTIME ERROR: Variable %s not defined\n", name);
+    exit(1);
+}
+
 Value getVal(Environment* env, char* name) {
     Environment* currEnv = env;
     while (currEnv) {
@@ -55,7 +72,7 @@ Value interpretExpression(ASTNode* node, Environment* env) {
     if (node->type == NODE_IDENT) {
         return getVal(env, node->value);
     }
-   if (node->type == NODE_BINOP) {
+   if (node->type == NODE_BINOP|| node->type == NODE_COMPARE) {
     Value left = interpretExpression(node->left, env);
     Value right = interpretExpression(node->right, env);
 
@@ -67,6 +84,18 @@ Value interpretExpression(ASTNode* node, Environment* env) {
         if (strcmp(node->value, "/") == 0) {
             if (right.data.i_val == 0) { printf("RUNTIME ERROR: Division by zero\n"); exit(1); }
             res.data.i_val = left.data.i_val / right.data.i_val;
+        }
+        if (strcmp(node->value, "<") == 0) {
+          res.type = "bool";
+          res.data.b_val = left.data.i_val < right.data.i_val;
+        }
+        else if (strcmp(node->value, ">") == 0) {
+          res.type = "bool";
+          res.data.b_val = left.data.i_val > right.data.i_val;
+        }
+        else if (strcmp(node->value, "==") == 0) {
+         res.type = "bool";
+         res.data.b_val = left.data.i_val == right.data.i_val;
         }
     } 
     else if (strcmp(left.type, "float") == 0 || strcmp(right.type, "float") == 0) {
@@ -80,6 +109,18 @@ Value interpretExpression(ASTNode* node, Environment* env) {
         if (strcmp(node->value, "/") == 0) {
             if (r_val == 0.0) { printf("RUNTIME ERROR: Division by zero\n"); exit(1); }
             res.data.f_val = l_val / r_val;
+        }
+        else if (strcmp(node->value, "<") == 0) {
+         res.type = "bool";
+         res.data.b_val = l_val < r_val;
+        }
+        else if (strcmp(node->value, ">") == 0) {
+         res.type = "bool";
+         res.data.b_val = l_val > r_val;
+        }
+        else if (strcmp(node->value, "==") == 0) {
+         res.type = "bool";
+         res.data.b_val = l_val == r_val;
         }
     }
     return res;
@@ -99,15 +140,42 @@ void interpret(ASTNode* node, Environment* env) {
     }
     
     setVal(env, node->value, val);
+    interpret(node->next, env);
+    return;
 }
     else if (node->type == NODE_PRINT) {
         Value v = interpretExpression(node->right, env);
         if (strcmp(v.type, "int") == 0) printf("%d\n", v.data.i_val);
         else if (strcmp(v.type, "float") == 0) printf("%f\n", v.data.f_val);
         else printf("%s\n", v.data.b_val ? "true" : "false");
+        interpret(node->next, env);
+        return;
+    }
+    else if (node->type == NODE_WHILE) {
+    while (1) {
+        Value condition = interpretExpression(node->condition, env);
+        
+        if (strcmp(condition.type, "bool") != 0) {
+            printf("RUNTIME ERROR: While condition must be bool\n");
+            exit(1);
+        }
+
+        if (condition.data.b_val) {
+            interpret(node->left, env);
+        } else {
+            break;
+        }
+    }
+    interpret(node->next, env);
+     return;
+}
+    else if (node->type == NODE_ASSIGN) {
+     Value val = interpretExpression(node->right, env);
+     updateVal(env, node->value, val);
+     interpret(node->next, env);
+     return;
     }
 
     interpret(node->left, env);
     interpret(node->right, env);
-    interpret(node->next, env);
 }

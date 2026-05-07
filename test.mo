@@ -1,11 +1,8 @@
 fn main() {
-    let gravity float = 9.8;
-    let base int = 10;
-    let result float = base + gravity; 
-    print(result);
-
-
-    print(10 / 0);
-    
+    let x float = 0.0;
+    while (x < 3.0) {
+        print(x);
+        x = x + 0.5;
+    }
     return 0;
 }
