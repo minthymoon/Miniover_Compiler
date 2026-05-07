@@ -1,0 +1,10 @@
+data/
+compiler.exe
+*.exe
+*.o
+
+lex.yy.c
+miniover.tab.c
+miniover.tab.h
+
+*.stackdump
