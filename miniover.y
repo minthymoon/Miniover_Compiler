@@ -28,7 +28,7 @@ Environment* globalEnv;
 %token LPAREN RPAREN LBRACE RBRACE SEMICOLON COMMA ARROW
 
 %type <str_val> type_spec
-%type <node> program external_list external_decl stmt_list stmt expr var_decl
+%type <node> program external_list external_decl stmt_list stmt expr var_decl param_list params arg_list args
 
 
 %left OR
@@ -55,9 +55,11 @@ external_list:
 
 external_decl:
     var_decl { $$ = $1; }
-    | FN IDENT LPAREN RPAREN LBRACE stmt_list RBRACE { 
-        $$ = createNode(NODE_FUNCTION, $2, "function"); 
-        $$->left = $6; 
+    | FN IDENT LPAREN param_list RPAREN ARROW type_spec LBRACE stmt_list RBRACE { 
+        $$ = createNode(NODE_FUNCTION, $2, "function");
+        $$->params = $4; 
+        $$->left = $9; 
+        addSymbol(globalTable, $2, $7, 1);
     }
     ;
 
@@ -105,6 +107,10 @@ var_decl:
         $$->right = $5;
         addSymbol(globalTable, $2, $3, 0);
     }
+    | LET IDENT ASSIGN expr SEMICOLON {
+        $$ = createNode(NODE_VAR_DECL, $2, NULL); 
+        $$->right = $4;
+    }
     | GLOBAL IDENT type_spec ASSIGN expr SEMICOLON {
         $$ = createNode(NODE_VAR_DECL, $2, $3); 
         $$->value = "global";
@@ -116,6 +122,20 @@ type_spec:
     TYPE_INT    { $$ = $1; }
     | TYPE_FLOAT  { $$ = $1; }
     | TYPE_BOOL   { $$ = $1; }
+    ;
+param_list:
+    /* empty */ { $$ = NULL; }
+    | params { $$ = $1; }
+    ;
+params:
+    IDENT type_spec { 
+        $$ = createNode(NODE_PARAM, $1, $2); 
+    }
+    | IDENT type_spec COMMA params { 
+        ASTNode* p = createNode(NODE_PARAM, $1, $2);
+        p->next = $4;
+        $$ = p;
+    }
     ;
 
 expr:
@@ -135,6 +155,25 @@ expr:
     | expr AND expr     { $$ = createNode(NODE_BINOP, "&&", NULL);   $$->left = $1; $$->right = $3; }
     | expr OR expr      { $$ = createNode(NODE_BINOP, "||", NULL);   $$->left = $1; $$->right = $3; }
     | LPAREN expr RPAREN { $$ = $2; }
+    | IDENT LPAREN arg_list RPAREN {
+        $$ = createNode(NODE_CALL, $1, NULL);
+        $$->right = $3; // Store arguments here
+    }
+    ;
+    arg_list:
+    /* empty */ { $$ = NULL; }
+    | args { $$ = $1; }
+    ;
+
+    args:
+    expr { $$ = $1; }
+    | expr COMMA args { $1->next = $3; $$ = $1; }
+    ;
+    | NOT expr { 
+        $$ = createNode(NODE_UNARYOP, "!", NULL); 
+        $$->right = $2; 
+    }
+    ;
     ;
 
 %%
@@ -146,14 +185,23 @@ void yyerror(const char *s) {
 int main() {
     globalTable = createTable(NULL);
     yyparse();
+    
     if (root) {
         printf("\n--- Starting Type Checking ---\n");
         typeCheck(root, globalTable);
         printf("Type Checking Passed Successfully!\n");
-    }
-    printf("\n--- Starting Program Execution ---\n");
-        globalEnv = createEnv(NULL);
-        interpret(root, globalEnv);
+        
+        printf("--- Starting Program Execution ---\n");
+        Environment* globalEnv = createEnv(NULL);
+        
+        interpret(root, globalEnv); 
+
+        Value mainFunc = getVal(globalEnv, "main");
+        ASTNode* mainNode = (ASTNode*)mainFunc.data.node_ptr;
+    
+        interpret(mainNode->left, globalEnv); 
+        
         printf("\n--- Execution Finished ---\n");
+    }
     return 0;
 }

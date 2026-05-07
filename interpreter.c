@@ -72,6 +72,27 @@ Value interpretExpression(ASTNode* node, Environment* env) {
     if (node->type == NODE_IDENT) {
         return getVal(env, node->value);
     }
+
+  if (node->type == NODE_CALL) {
+    Value funcVal = getVal(env, node->value);
+    ASTNode* funcNode = (ASTNode*)funcVal.data.node_ptr;
+    Environment* localEnv = createEnv(env); 
+    ASTNode* param = funcNode->params;
+    ASTNode* arg = node->right; 
+    
+    while (param && arg) {
+        Value val = interpretExpression(arg, env);
+        if (strcmp(param->dataType, "float") == 0 && strcmp(val.type, "int") == 0) {
+            val.type = "float";
+            val.data.f_val = (double)val.data.i_val;
+        }
+        
+        setVal(localEnv, param->value, val);
+        param = param->next;
+        arg = arg->next;
+    }
+    return interpret(funcNode->left, localEnv);
+}
    if (node->type == NODE_BINOP|| node->type == NODE_COMPARE) {
     Value left = interpretExpression(node->left, env);
     Value right = interpretExpression(node->right, env);
@@ -128,8 +149,43 @@ Value interpretExpression(ASTNode* node, Environment* env) {
     return res;
 }
 
-void interpret(ASTNode* node, Environment* env) {
-    if (!node) return;
+Value interpret(ASTNode* node, Environment* env) {
+   Value voidVal = { .type = "void" }; 
+    if (!node) return voidVal;
+
+    if (node->type == NODE_RETURN) {
+        return interpretExpression(node->right, env);
+    }
+
+
+    if (node->type == NODE_FUNCTION) {
+    Value funcVal;
+    funcVal.type = "function";
+    funcVal.data.node_ptr = node;
+    setVal(env, node->value, funcVal);  
+    return interpret(node->next, env);
+}
+
+if (node->type == NODE_CALL) {
+    Value funcVal = getVal(env, node->value);
+    ASTNode* funcNode = (ASTNode*)funcVal.data.node_ptr;
+    Environment* localEnv = createEnv(env);
+    ASTNode* param = funcNode->params;
+    ASTNode* arg = node->right;
+
+    while (param && arg) {
+        Value val = interpretExpression(arg, env);
+
+        if (strcmp(param->dataType, "float") == 0 && strcmp(val.type, "int") == 0) {
+            val.type = "float";
+            val.data.f_val = (double)val.data.i_val;
+        }   
+        setVal(localEnv, param->value, val);
+        param = param->next;
+        arg = arg->next;
+    }
+   return interpret(funcNode->left, localEnv);
+}
 
    if (node->type == NODE_VAR_DECL) {
     Value val = interpretExpression(node->right, env);
@@ -140,16 +196,14 @@ void interpret(ASTNode* node, Environment* env) {
     }
     
     setVal(env, node->value, val);
-    interpret(node->next, env);
-    return;
+    return interpret(node->next, env);
 }
     else if (node->type == NODE_PRINT) {
         Value v = interpretExpression(node->right, env);
         if (strcmp(v.type, "int") == 0) printf("%d\n", v.data.i_val);
         else if (strcmp(v.type, "float") == 0) printf("%f\n", v.data.f_val);
         else printf("%s\n", v.data.b_val ? "true" : "false");
-        interpret(node->next, env);
-        return;
+        return interpret(node->next, env);
     }
     else if (node->type == NODE_WHILE) {
     while (1) {
@@ -166,16 +220,18 @@ void interpret(ASTNode* node, Environment* env) {
             break;
         }
     }
-    interpret(node->next, env);
-     return;
+     return interpret(node->next, env);
 }
     else if (node->type == NODE_ASSIGN) {
      Value val = interpretExpression(node->right, env);
      updateVal(env, node->value, val);
-     interpret(node->next, env);
-     return;
+     return interpret(node->next, env);
     }
 
-    interpret(node->left, env);
-    interpret(node->right, env);
+   Value leftRes = interpret(node->left, env);
+    if (strcmp(leftRes.type, "void") != 0) return leftRes;
+   Value rightRes = interpret(node->right, env);
+    if (strcmp(rightRes.type, "void") != 0) return rightRes;
+
+    return voidVal;
 }

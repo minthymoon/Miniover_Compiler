@@ -20,7 +20,10 @@ typedef enum {
     NODE_FLOAT_LIT,   //float lits
     NODE_BOOL_LIT,    //the true and false ones
     NODE_IDENT,
-    NODE_BLOCK 
+    NODE_BLOCK,
+    NODE_PARAM,
+    NODE_CALL,
+    NODE_UNARYOP
 } NodeType;
 
 
@@ -33,6 +36,8 @@ typedef struct ASTNode {
     struct ASTNode* condition;
     struct ASTNode* else_body;
     struct ASTNode* next;
+    struct ASTNode* params;
+    struct ASTNode* args;
 } ASTNode;
 
 ASTNode* createNode(NodeType type, char* value, char* dataType);
