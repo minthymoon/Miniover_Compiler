@@ -73,7 +73,7 @@ void typeCheck(ASTNode* node, SymbolTable* table) {
     typeCheck(node->next, table);
     return; 
 }
-
+//type_error
   if (node->type == NODE_VAR_DECL) {
     char* exprType = checkExpression(node->right, table);
     char* finalType = node->dataType ? node->dataType : exprType;
